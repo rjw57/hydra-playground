@@ -14,6 +14,12 @@ window.App = {
     const userInfoUri = 'https://localhost:9000/userinfo';
     const apiExampleUri = 'http://localhost:9040/';
 
+    function logout() {
+      openGrantWindow('http://localhost:9020/accounts/logout');
+      document.body.classList.remove('user-logged-in');
+      document.body.classList.add('user-logged-out');
+    }
+
     function login() {
       const token = new Promise((resolve, reject) => {
         window.addEventListener('message', event => {
@@ -61,14 +67,19 @@ window.App = {
         })
         .catch(console.error);
 
+      openGrantWindow(auth.token.getUri());
+    }
+
+    function openGrantWindow(url) {
       const w = 450, h = 600;
       let left = window.screenX + 0.5 * window.outerWidth - 0.5 * w;
       let top = window.screenY + 0.5 * window.outerHeight - 0.5 * h;
       let features = 'left=' + left + ',top=' + top + ',width=' + w + ',height=' + h;
-      window.open(auth.token.getUri(), 'OAuthImplicitGrant', features);
+      window.open(url, 'OAuthImplicitGrant', features);
     }
 
     document.getElementById('login').addEventListener('click', () => {login();});
+    document.getElementById('logout').addEventListener('click', () => {logout();});
     login();
   },
 
