@@ -59,6 +59,8 @@ services:
       - POSTGRES_USER=hydra
       - POSTGRES_PASSWORD=secret
       - POSTGRES_DB=hydra
+    ports:
+      - 9432:5432
     networks:
       - hydra
 
