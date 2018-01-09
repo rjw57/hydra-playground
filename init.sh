@@ -49,12 +49,12 @@ hydra policies create --skip-tls-verify \
 hydra clients create --skip-tls-verify \
 	--id ${API_CLIENT_ID} --secret ${API_CLIENT_SECRET} \
 	--name "Api Client" \
-	--grant-types client_credentials \
+	--grant-types token,client_credentials \
 	--response-types token \
 	--allowed-scopes openid,offline,hydra.clients,hydra.introspect \
 	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
 
-export CLIENT_ID=${ROOT_CLIENT_ID}
-export CLIENT_SECRET=${ROOT_CLIENT_SECRET}
+#export CLIENT_ID=${API_CLIENT_ID}
+#export CLIENT_SECRET=${API_CLIENT_SECRET}
 
 hydra token client --skip-tls-verify
