@@ -12,21 +12,26 @@
   </head>
   <body class="user-logged-out">
     <section class="show-user-logged-out">
+      <p>Login should happen automatically but if not, here is a button.</p>
       <button id="login">Login</button>
     </section>
     <section class="show-user-logged-in">
-      <h1>Token</h1>
+      <h1>Logged in</h1>
+      <p>
+        <a href="http://localhost:9020/accounts/logout">Log out</a>
+      </p>
+      <h2>Token</h2>
       <p>
         The access token itself:
         <span id="token">Loading &hellip;</span>
       </p>
       <p>This could be persisted to localStorage to survive a refresh.</p>
-      <h1>User info</h1>
+      <h2>User info</h2>
       <p>
         Information on us provided by Hydra:
         <span id="user-info">Loading &hellip;</span>
       </p>
-      <h1>API response</h1>
+      <h2>API response</h2>
       <p>
         The API decided what we could do based on the following information:
       </p>

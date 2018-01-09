@@ -7,7 +7,7 @@ window.App = {
       clientId: 'some-consumer',
       authorizationUri: 'https://localhost:9000/oauth2/auth',
       redirectUri: 'http://localhost:9030/callback.html',
-      scopes: ['openid', 'hydra.clients', 'profile', 'offline'],
+      scopes: ['openid', 'hydra.clients', 'profile', 'offline', 'email'],
       state: state,
     });
     console.log('auth:', auth);
@@ -61,10 +61,11 @@ window.App = {
         })
         .catch(console.error);
 
-      window.open(
-        auth.token.getUri(), 'OAuthImplicitGrant',
-        'width=450,height=800'
-      );
+      const w = 450, h = 600;
+      let left = window.screenX + 0.5 * window.outerWidth - 0.5 * w;
+      let top = window.screenY + 0.5 * window.outerHeight - 0.5 * h;
+      let features = 'left=' + left + ',top=' + top + ',width=' + w + ',height=' + h;
+      window.open(auth.token.getUri(), 'OAuthImplicitGrant', features);
     }
 
     document.getElementById('login').addEventListener('click', () => {login();});

@@ -19,14 +19,17 @@ services:
     links:
       - db
   consent-app:
-    image: oryd/hydra-consent-app-express:latest
+    #image: oryd/hydra-consent-app-express:latest
+    build:
+      context: ./consent-app
+    volumes:
+      - "./consent-app:/usr/src/app:ro"
     ports:
-      - 9020:3000
+      - 9020:8000
     environment:
       - HYDRA_CLIENT_ID=consent-app
       - HYDRA_CLIENT_SECRET=consent-secret
       - HYDRA_URL=https://hydra:4444
-      - NODE_TLS_REJECT_UNAUTHORIZED=0
     networks:
       - hydra
     links:
@@ -59,6 +62,18 @@ services:
       - POSTGRES_USER=hydra
       - POSTGRES_PASSWORD=secret
       - POSTGRES_DB=hydra
+    ports:
+      - 9432:5432
+    networks:
+      - hydra
+  db:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_USER=hydra
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=hydra
+    volumes:
+      - "./postgres/:/docker-entrypoint-initdb.d:ro"
     ports:
       - 9432:5432
     networks:

@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
-set -x
+set -xe
 
-# Wait for a particular network service to start
-function wait-for-start() {
-	while ! echo exit | nc "$1" "$2"; do sleep 1; done
-}
+source secrets.env
 
 # Bring up services in the right order, database first, then hydra and then the
 # various web apps.
-docker-compose up -d db
-wait-for-start localhost 9432
-docker-compose run hydra migrate sql postgres://hydra:secret@db:5432/hydra?sslmode=disable
-docker-compose up -d hydra
-wait-for-start localhost 9000
-docker-compose up -d
 
-source secrets.env
+# Start database
+docker-compose up -d db
+
+# Start database migration, hydra has its own waiting code for the DB.
+docker-compose run hydra migrate sql postgres://hydra:secret@db:5432/hydra?sslmode=disable
+
+# Launch Hydra and wait for status to be ok
+docker-compose up -d hydra
+while ! curl -k https://localhost:9000/health/status; do sleep 0.1; done
 
 function hydra() {
 	docker run --rm -it \
@@ -30,16 +29,16 @@ function hydra() {
 export CLIENT_ID=${ROOT_CLIENT_ID}
 export CLIENT_SECRET=${ROOT_CLIENT_SECRET}
 
-hydra clients delete --skip-tls-verify ${CONSENT_CLIENT_ID}
-hydra clients delete --skip-tls-verify ${CONSUMER_CLIENT_ID}
-hydra clients delete --skip-tls-verify ${API_CLIENT_ID}
+hydra clients delete --skip-tls-verify ${CONSENT_CLIENT_ID} || true
+hydra clients delete --skip-tls-verify ${CONSUMER_CLIENT_ID} || true
+hydra clients delete --skip-tls-verify ${API_CLIENT_ID} || true
 
 hydra clients create --skip-tls-verify \
 	--id ${CONSENT_CLIENT_ID} --secret ${CONSENT_CLIENT_SECRET} \
 	--name "Consent App Client" \
 	--grant-types client_credentials \
 	--response-types token \
-	--allowed-scopes hydra.consent
+	--allowed-scopes hydra.consent,hydra.clients
 hydra policies create --skip-tls-verify \
 	--actions get,accept,reject \
 	--description "Allow consent-app to manage OAuth2 consent requests." \
@@ -47,13 +46,20 @@ hydra policies create --skip-tls-verify \
 	--id consent-app-policy \
 	--resources "rn:hydra:oauth2:consent:requests:<.*>" \
 	--subjects ${CONSENT_CLIENT_ID}
+hydra policies create --skip-tls-verify \
+	--actions get \
+	--description "Allow consent-app to see clients." \
+	--allow \
+	--id consent-app-clients-policy \
+	--resources "rn:hydra:clients:<.*>" \
+	--subjects ${CONSENT_CLIENT_ID}
 
 hydra clients create --skip-tls-verify \
 	--id ${CONSUMER_CLIENT_ID} --secret ${CONSUMER_CLIENT_SECRET} \
-	--name "Consumer Client" \
+	--name "SampleFrontendApplication" \
 	--grant-types authorization_code,refresh_token,client_credentials,implicit \
 	--response-types token,code,id_token \
-	--allowed-scopes openid,offline,hydra.clients,profile \
+	--allowed-scopes openid,offline,hydra.clients,profile,email \
 	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
 hydra policies create --skip-tls-verify \
 	--actions introspect \
@@ -77,3 +83,6 @@ hydra token client --skip-tls-verify
 export CLIENT_ID=${API_CLIENT_ID}
 export CLIENT_SECRET=${API_CLIENT_SECRET}
 hydra token client --skip-tls-verify --scopes offline,hydra.introspect
+
+# Launch rest of infrastructure now we have clients, etc
+docker-compose up -d

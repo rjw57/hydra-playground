@@ -22,6 +22,7 @@ client = OAuth2Session(
     client=BackendApplicationClient(client_id=API_CLIENT_ID))
 client.fetch_token(token_url=TOKEN_URL, client_id=API_CLIENT_ID,
                    client_secret=API_CLIENT_SECRET,
+                   auto_refresh_url=TOKEN_URL,
                    scope=SCOPES, verify=False),
 
 

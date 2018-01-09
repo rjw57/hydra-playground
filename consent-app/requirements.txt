@@ -1,0 +1,6 @@
+django
+psycopg2
+django-ucamwebauth>=1.4.5
+oauthlib
+requests-oauthlib
+django-ucamlookup
