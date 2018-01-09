@@ -67,6 +67,7 @@ window.App = {
     }
 
     document.getElementById('login').addEventListener('click', () => {login();});
+    login();
   },
 
   callbackLoaded: () => {
