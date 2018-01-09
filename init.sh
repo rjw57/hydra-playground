@@ -36,7 +36,7 @@ hydra clients create --skip-tls-verify \
 	--name "Consumer Client" \
 	--grant-types authorization_code,refresh_token,client_credentials,implicit \
 	--response-types token,code,id_token \
-	--allowed-scopes openid,offline,hydra.clients \
+	--allowed-scopes openid,offline,hydra.clients,profile \
 	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
 hydra policies create --skip-tls-verify \
 	--actions introspect \
@@ -51,7 +51,7 @@ hydra clients create --skip-tls-verify \
 	--name "Api Client" \
 	--grant-types token,client_credentials \
 	--response-types token \
-	--allowed-scopes openid,offline,hydra.clients,hydra.introspect \
+	--allowed-scopes openid,offline,hydra.clients,hydra.introspect,profile \
 	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
 
 #export CLIENT_ID=${API_CLIENT_ID}

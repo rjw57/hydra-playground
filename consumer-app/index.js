@@ -7,7 +7,7 @@ window.App = {
       clientId: 'some-consumer',
       authorizationUri: 'https://localhost:9000/oauth2/auth',
       redirectUri: 'http://localhost:9030/callback.html',
-      scopes: ['openid', 'hydra.clients'],
+      scopes: ['openid', 'hydra.clients', 'profile'],
       state: state,
     });
     const userInfoUri = 'https://localhost:9000/userinfo';

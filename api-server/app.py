@@ -45,4 +45,5 @@ def index():
 
     return jsonify({
         'clientId': client_id, 'user': user_urn, 'scopes': scopes,
+        'tokenInfo': token_info,
     })
