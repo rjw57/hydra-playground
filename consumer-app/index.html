@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Example app</title>
+    <style>
+.user-logged-out .show-user-logged-out { display: inherit; }
+.user-logged-in .show-user-logged-out { display: none; }
+.user-logged-out .show-user-logged-in { display: none; }
+.user-logged-in .show-user-logged-in { display: inherit; }
+    </style>
+  <meta charset="UTF-8">
+  </head>
+  <body class="user-logged-out">
+    <section class="show-user-logged-out">
+      <button id="login">Login</button>
+    </section>
+    <section class="show-user-logged-in">
+      <h1>Token</h1>
+      <p>
+        The access token itself:
+        <span id="token">Loading &hellip;</span>
+      </p>
+      <p>This could be persisted to localStorage to survive a refresh.</p>
+      <h1>User info</h1>
+      <p>
+        Information on us provided by Hydra:
+        <span id="user-info">Loading &hellip;</span>
+      </p>
+      <h1>API response</h1>
+      <p>
+        The API decided what we could do based on the following information:
+      </p>
+      <p>Client id: <span id="my-client-id">Loading &hellip;</span></p>
+      <p>User: <span id="my-user">Loading &hellip;</span></p>
+      <p>Scopes: <span id="my-scopes">Loading &hellip;</span></p>
+    </section>
+    <script src="bundle.js"></script>
+    <script>window.onload = App.indexLoaded;</script>
+  </body>
+</html>
