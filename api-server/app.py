@@ -1,22 +1,32 @@
 from flask import Flask, abort, request, jsonify
-from flask_cors import CORS
-import requests
-from requests.auth import HTTPBasicAuth
+from flask_cors import cross_origin
+from requests_oauthlib import OAuth2Session
+from oauthlib.oauth2 import BackendApplicationClient
 
 API_CLIENT_ID = 'api-server'
 API_CLIENT_SECRET = 'api-secret'
 
-# In production, the client should really just get a token from Hydra using the
-# usual client credentials flow. Basic Auth does work too though.
-AUTH = HTTPBasicAuth(API_CLIENT_ID, API_CLIENT_SECRET)
+# OAuth2 token provider endpoints
+PROVIDER_BASE_URL = 'https://hydra:4444/oauth2/'
+TOKEN_URL = PROVIDER_BASE_URL + 'token'
+INTROSPECT_URL = PROVIDER_BASE_URL + 'introspect'
+REFRESH_URL = TOKEN_URL
 
-# Hydra introspection endpoint
-INTROSPECT_URL = 'https://hydra:4444/oauth2/introspect'
+# Scopes we request
+SCOPES = ['offline', 'hydra.introspect']
 
 app = Flask(__name__)
-CORS(app)
+
+# Initialise OAuth2 client
+client = OAuth2Session(
+    client=BackendApplicationClient(client_id=API_CLIENT_ID))
+client.fetch_token(token_url=TOKEN_URL, client_id=API_CLIENT_ID,
+                   client_secret=API_CLIENT_SECRET,
+                   scope=SCOPES, verify=False),
+
 
 @app.route('/')
+@cross_origin()
 def index():
     authorization = request.headers.get('Authorization', '')
     if not authorization.startswith('Bearer '):
@@ -24,8 +34,7 @@ def index():
 
     token = authorization.split()[1]
 
-    r = requests.post(INTROSPECT_URL, auth=AUTH, verify=False,
-                      data={'token': token})
+    r = client.post(INTROSPECT_URL, data={'token': token})
     r.raise_for_status()
     token_info = r.json()
 

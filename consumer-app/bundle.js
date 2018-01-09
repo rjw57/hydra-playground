@@ -8,9 +8,10 @@ window.App = {
       clientId: 'some-consumer',
       authorizationUri: 'https://localhost:9000/oauth2/auth',
       redirectUri: 'http://localhost:9030/callback.html',
-      scopes: ['openid', 'hydra.clients', 'profile'],
+      scopes: ['openid', 'hydra.clients', 'profile', 'offline'],
       state: state,
     });
+    console.log('auth:', auth);
     const userInfoUri = 'https://localhost:9000/userinfo';
     const apiExampleUri = 'http://localhost:9040/';
 
@@ -35,7 +36,7 @@ window.App = {
       });
 
       token.then(token => {
-        console.log('access token:', token.accessToken);
+        console.log('token:', token);
       });
 
       token
