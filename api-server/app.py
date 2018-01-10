@@ -50,7 +50,7 @@ def index():
 
     token = authorization.split()[1]
 
-    r = client.post(INTROSPECT_URL, data={'token': token})
+    r = client.post(INTROSPECT_URL, timeout=1, data={'token': token})
     r.raise_for_status()
     token_info = r.json()
 
