@@ -94,6 +94,8 @@ window.App = {
           document.getElementById('my-client-id').textContent = response.clientId;
           document.getElementById('my-user').textContent = response.user;
           document.getElementById('my-scopes').textContent = response.scopes.join(', ');
+          document.getElementById('i-am-admin').textContent =
+            response.isAdmin ? "YES" : "NO";
         })
         .catch(console.error);
 
