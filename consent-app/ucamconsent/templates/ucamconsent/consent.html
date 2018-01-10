@@ -13,7 +13,7 @@
       <ul style="list-style-type: none">
       {% for scope in novel_scopes %}
         <li>
-          <input id="scope.{{forloop.counter}}" type="checkbox"
+          <input id="scope.{{forloop.counter}}" type="checkbox" checked
               value="{{scope.scope}}" name="granted_scopes">
           <label for="scope.{{forloop.counter}}">
             {{scope.description}}
