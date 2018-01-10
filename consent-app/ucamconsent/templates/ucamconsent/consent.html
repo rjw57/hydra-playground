@@ -11,7 +11,7 @@
       {% csrf_token %}
       <input type="hidden" name="consent" value="{{consent_request.id}}">
       <ul style="list-style-type: none">
-      {% for scope in requested_scopes %}
+      {% for scope in novel_scopes %}
         <li>
           <input id="scope.{{forloop.counter}}" type="checkbox"
               value="{{scope.scope}}" name="granted_scopes">
@@ -21,6 +21,14 @@
         </li>
       {% endfor %}
       </ul>
+      {% if previously_granted_scopes %}
+        <p>You have previously authorized access to the following:</p>
+        <ul>
+          {% for scope in previously_granted_scopes %}
+            <li>{{scope.description}}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
       <div style="text-align: center;">
         <input type="submit" name="decision" value="Accept">
         <input type="submit" name="decision" value="Reject">

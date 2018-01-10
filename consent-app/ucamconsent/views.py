@@ -11,6 +11,8 @@ from django.contrib.auth.decorators import login_required
 from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import BackendApplicationClient
 
+from .models import Grant
+
 LOG = logging.getLogger('ucamconsent')
 
 CLIENT_ID = 'consent-app'
@@ -31,21 +33,6 @@ SCOPE_DESCS = {
     'profile': 'Your name',
     'email': 'Your email address',
 }
-
-
-def get_session():
-    LOG.info('Fetching initial token')
-    client = BackendApplicationClient(client_id=CLIENT_ID)
-    session = OAuth2Session(client=client)
-    access_token = session.fetch_token(
-        timeout=1, token_url=TOKEN_URL,
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        scope=SCOPES,
-        verify=False)
-    LOG.info('Got access token: %r', access_token)
-
-    return session
 
 
 @login_required
@@ -74,14 +61,32 @@ def consent(request):
     client_info = r.json()
     LOG.info('client: %r', client_info)
 
+    # Get user's previous grants
+    previous_grants = Grant.objects.filter(user=request.user)
+
     requested_scopes = [
-        {'scope': scope, 'description': SCOPE_DESCS.get(scope, scope)}
+        {
+            'scope': scope,
+            'description': SCOPE_DESCS.get(scope, scope),
+            'previously_granted': previous_grants.filter(
+                scope=scope, client=client_info['id']
+            ).exists(),
+        }
         for scope in consent_request.get('requestedScopes', [])
     ]
+
+    # If all the scopes were previously granted, just accept.
+    if all(s['previously_granted'] for s in requested_scopes):
+        return resolve_consent_request(
+            request, consent_request=consent_request,
+            accept=True,
+            grant_scopes=[s['scope'] for s in requested_scopes])
 
     context = {
         'consent_request': consent_request, 'client': client_info,
         'requested_scopes': requested_scopes,
+        'previously_granted_scopes': [s for s in requested_scopes if s['previously_granted']],
+        'novel_scopes': [s for s in requested_scopes if not s['previously_granted']],
     }
     return render(request, 'ucamconsent/consent.html', context)
 
@@ -111,20 +116,56 @@ def decide(request):
 
     LOG.info('POST data: %r', request.POST)
 
+    # Get user's previous grants
+    previous_grants = Grant.objects.filter(user=request.user)
+
     # Granted scopes are intersection of the scopes we got from the POST and the scopes which were
-    # actually requested.
+    # actually requested and the previously granted scopes.
     requested_scopes = set(consent_request.get('requestedScopes', []))
     granted_scopes = set(request.POST.getlist('granted_scopes'))
+    granted_scopes |= set(
+        grant.scope
+        for grant in previous_grants.filter(client=consent_request['clientId']).all()
+    )
     LOG.info('requested scopes: %r', requested_scopes)
     LOG.info('granted scopes: %r', granted_scopes)
 
     granted_scopes &= requested_scopes
     LOG.info('final list of granted scopes: %r', granted_scopes)
 
+    # Record grant in DB
+    for scope in granted_scopes:
+        Grant.objects.get_or_create(
+            user=request.user, scope=scope, client=consent_request['clientId'])
+
     return resolve_consent_request(
         request, consent_request=consent_request,
         accept=request.POST.get('decision') == 'Accept',
         grant_scopes=list(granted_scopes))
+
+
+@login_required
+def logout(request):
+    logout_request(request)
+    redirect_url = request.GET.get('redirect_url')
+    if redirect_url is not None:
+        return HttpResponseRedirect(redirect_url)
+    return render(request, 'ucamconsent/logout.html')
+
+
+def get_session():
+    LOG.info('Fetching initial token')
+    client = BackendApplicationClient(client_id=CLIENT_ID)
+    session = OAuth2Session(client=client)
+    access_token = session.fetch_token(
+        timeout=1, token_url=TOKEN_URL,
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        scope=SCOPES,
+        verify=False)
+    LOG.info('Got access token: %r', access_token)
+
+    return session
 
 
 def resolve_consent_request(request, consent_request, accept, grant_scopes):
@@ -166,12 +207,3 @@ def resolve_consent_request(request, consent_request, accept, grant_scopes):
     r.raise_for_status()
 
     return HttpResponseRedirect(redirect_url)
-
-
-@login_required
-def logout(request):
-    logout_request(request)
-    redirect_url = request.GET.get('redirect_url')
-    if redirect_url is not None:
-        return HttpResponseRedirect(redirect_url)
-    return render(request, 'ucamconsent/logout.html')
