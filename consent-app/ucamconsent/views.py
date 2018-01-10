@@ -1,9 +1,10 @@
 import logging
 from urllib.parse import urljoin
 
+from django.contrib.auth import logout as logout_request
 from django.http import (
     HttpResponseBadRequest, HttpResponseForbidden,
-    HttpResponseRedirect
+    HttpResponseRedirect, HttpResponseNotAllowed
 )
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -24,16 +25,27 @@ CLIENTS_URL = urljoin(PROVIDER_BASE_URL, 'clients/')
 # Scopes we request
 SCOPES = ['hydra.consent', 'hydra.clients']
 
-# Initialise OAuth2 client
-client = OAuth2Session(
-    client=BackendApplicationClient(client_id=CLIENT_ID))
-client_token = client.fetch_token(
-    token_url=TOKEN_URL, client_id=CLIENT_ID,
-    auto_refresh_url=TOKEN_URL,
-    client_secret=CLIENT_SECRET,
-    scope=SCOPES, verify=False)
+# Scope descriptions
+SCOPE_DESCS = {
+    'offline': 'Offline access to your account',
+    'profile': 'Your name',
+    'email': 'Your email address',
+}
 
-LOG.warning('Client token: %r', client_token)
+
+def get_session():
+    LOG.info('Fetching initial token')
+    client = BackendApplicationClient(client_id=CLIENT_ID)
+    session = OAuth2Session(client=client)
+    access_token = session.fetch_token(
+        timeout=1, token_url=TOKEN_URL,
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        scope=SCOPES,
+        verify=False)
+    LOG.info('Got access token: %r', access_token)
+
+    return session
 
 
 @login_required
@@ -41,7 +53,10 @@ def consent(request):
     if request.user.is_anonymous:
         return HttpResponseForbidden('No auth')
 
-    LOG.warning('Logged in as: %r', request.user)
+    LOG.info('Logged in as: %r', request.user)
+
+    # In production, this would be cached.
+    client = get_session()
 
     consent = request.GET.get('consent')
     if consent is None:
@@ -51,21 +66,71 @@ def consent(request):
     r = client.get(urljoin(CONSENT_REQUESTS_URL, consent))
     r.raise_for_status()
     consent_request = r.json()
-    LOG.warning('request: %r', consent_request)
+    LOG.info('request: %r', consent_request)
 
     # Get client info from hydra
     r = client.get(urljoin(CLIENTS_URL, consent_request['clientId']))
     r.raise_for_status()
     client_info = r.json()
-    LOG.warning('client: %r', client_info)
+    LOG.info('client: %r', client_info)
 
-    grant_scopes = consent_request['requestedScopes']
+    requested_scopes = [
+        {'scope': scope, 'description': SCOPE_DESCS.get(scope, scope)}
+        for scope in consent_request.get('requestedScopes', [])
+    ]
+
+    context = {
+        'consent_request': consent_request, 'client': client_info,
+        'requested_scopes': requested_scopes,
+    }
+    return render(request, 'ucamconsent/consent.html', context)
+
+
+@login_required
+def decide(request):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    if request.user.is_anonymous:
+        return HttpResponseForbidden('No auth')
+
+    LOG.info('Logged in as: %r', request.user)
+
+    # In production, this would be cached.
+    client = get_session()
+
+    consent = request.POST.get('consent')
+    if consent is None:
+        return HttpResponseBadRequest('no consent provided')
+
+    # Get consent info from hydra
+    r = client.get(urljoin(CONSENT_REQUESTS_URL, consent))
+    r.raise_for_status()
+    consent_request = r.json()
+    LOG.info('request: %r', consent_request)
+
+    LOG.info('POST data: %r', request.POST)
+
+    # Granted scopes are intersection of the scopes we got from the POST and the scopes which were
+    # actually requested.
+    requested_scopes = set(consent_request.get('requestedScopes', []))
+    granted_scopes = set(request.POST.getlist('granted_scopes'))
+    LOG.info('requested scopes: %r', requested_scopes)
+    LOG.info('granted scopes: %r', granted_scopes)
+
+    granted_scopes &= requested_scopes
+    LOG.info('final list of granted scopes: %r', granted_scopes)
+
     return resolve_consent_request(
-        request, consent_request=consent_request, accept=True,
-        grant_scopes=grant_scopes)
+        request, consent_request=consent_request,
+        accept=request.POST.get('decision') == 'Accept',
+        grant_scopes=list(granted_scopes))
 
 
 def resolve_consent_request(request, consent_request, accept, grant_scopes):
+    # In production, this would be cached.
+    client = get_session()
+
     redirect_url = consent_request['redirectUrl']
     consent_id = consent_request['id']
     id_extra = {}
@@ -80,7 +145,9 @@ def resolve_consent_request(request, consent_request, accept, grant_scopes):
 
     if 'profile' in grant_scopes:
         id_extra.update({
-            'name': request.user.get_full_name(),
+            # If we had lookup integration, we'd use it but I want the server to not depend on
+            # CUDN.
+            'name': '{0}y Mc{0}face'.format(request.user.username),
         })
 
     if accept:
@@ -99,10 +166,12 @@ def resolve_consent_request(request, consent_request, accept, grant_scopes):
     r.raise_for_status()
 
     return HttpResponseRedirect(redirect_url)
-#    context = {
-#        'consent_request': consent_request,
-#        'grant_scopes': grant_scopes,
-#        'accept': accept,
-#    }
-#
-#    return render(request, 'ucamconsent/consent.html', context)
+
+
+@login_required
+def logout(request):
+    logout_request(request)
+    redirect_url = request.GET.get('redirect_url')
+    if redirect_url is not None:
+        return HttpResponseRedirect(redirect_url)
+    return render(request, 'ucamconsent/logout.html')

@@ -4,17 +4,21 @@ set -xe
 source secrets.env
 
 # Bring up services in the right order, database first, then hydra and then the
-# various web apps.
+# various web apps. We need to wait for apps to be available before starting
+# because our noddy OAuth clients try to get a token when they first start.
 
-# Start database
+# Start and wait for database
 docker-compose up -d db
+while ! PGPASSWORD="secret" psql -h localhost -p 9432 -c 'SELECT 1;' hydra hydra; do
+	sleep 1
+done
 
-# Start database migration, hydra has its own waiting code for the DB.
+# Start database migration
 docker-compose run hydra migrate sql postgres://hydra:secret@db:5432/hydra?sslmode=disable
 
 # Launch Hydra and wait for status to be ok
 docker-compose up -d hydra
-while ! curl -k https://localhost:9000/health/status; do sleep 0.1; done
+while ! curl -k https://localhost:9000/health/status; do sleep 0.5; done
 
 function hydra() {
 	docker run --rm -it \
@@ -54,13 +58,6 @@ hydra policies create --skip-tls-verify \
 	--resources "rn:hydra:clients:<.*>" \
 	--subjects ${CONSENT_CLIENT_ID}
 
-hydra clients create --skip-tls-verify \
-	--id ${CONSUMER_CLIENT_ID} --secret ${CONSUMER_CLIENT_SECRET} \
-	--name "SampleFrontendApplication" \
-	--grant-types authorization_code,refresh_token,client_credentials,implicit \
-	--response-types token,code,id_token \
-	--allowed-scopes openid,offline,hydra.clients,profile,email \
-	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
 hydra policies create --skip-tls-verify \
 	--actions introspect \
 	--description "Allow everyone to read the OpenID Connect ID Token public key" \
@@ -70,11 +67,19 @@ hydra policies create --skip-tls-verify \
 	--subjects "<.*>"
 
 hydra clients create --skip-tls-verify \
+	--id ${CONSUMER_CLIENT_ID} --secret ${CONSUMER_CLIENT_SECRET} \
+	--name "SampleFrontendApplication" \
+	--grant-types authorization_code,implicit \
+	--response-types code,token \
+	--allowed-scopes https://automation.cam.ac.uk/funky-api,profile,email,openid \
+	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
+
+hydra clients create --skip-tls-verify \
 	--id ${API_CLIENT_ID} --secret ${API_CLIENT_SECRET} \
 	--name "Api Client" \
-	--grant-types refresh_token,client_credentials \
+	--grant-types client_credentials \
 	--response-types token \
-	--allowed-scopes offline,hydra.introspect
+	--allowed-scopes hydra.introspect
 
 export CLIENT_ID=${ROOT_CLIENT_ID}
 export CLIENT_SECRET=${ROOT_CLIENT_SECRET}
@@ -82,7 +87,7 @@ hydra token client --skip-tls-verify
 
 export CLIENT_ID=${API_CLIENT_ID}
 export CLIENT_SECRET=${API_CLIENT_SECRET}
-hydra token client --skip-tls-verify --scopes offline,hydra.introspect
+hydra token client --skip-tls-verify --scopes hydra.introspect
 
 # Launch rest of infrastructure now we have clients, etc
-docker-compose up -d
+docker-compose up --build -d

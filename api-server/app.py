@@ -1,10 +1,15 @@
+import logging
+
 from flask import Flask, abort, request, jsonify
 from flask_cors import cross_origin
 from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import BackendApplicationClient
 
-API_CLIENT_ID = 'api-server'
-API_CLIENT_SECRET = 'api-secret'
+LOG = logging.getLogger('apiserver')
+logging.basicConfig(level=logging.DEBUG)
+
+CLIENT_ID = 'api-server'
+CLIENT_SECRET = 'api-secret'
 
 # OAuth2 token provider endpoints
 PROVIDER_BASE_URL = 'https://hydra:4444/oauth2/'
@@ -13,22 +18,32 @@ INTROSPECT_URL = PROVIDER_BASE_URL + 'introspect'
 REFRESH_URL = TOKEN_URL
 
 # Scopes we request
-SCOPES = ['offline', 'hydra.introspect']
+SCOPES = ['hydra.introspect']
 
 app = Flask(__name__)
 
-# Initialise OAuth2 client
-client = OAuth2Session(
-    client=BackendApplicationClient(client_id=API_CLIENT_ID))
-client.fetch_token(token_url=TOKEN_URL, client_id=API_CLIENT_ID,
-                   client_secret=API_CLIENT_SECRET,
-                   auto_refresh_url=TOKEN_URL,
-                   scope=SCOPES, verify=False),
+
+def get_session():
+    LOG.info('Fetching initial token')
+    client = BackendApplicationClient(client_id=CLIENT_ID)
+    session = OAuth2Session(client=client)
+    access_token = session.fetch_token(
+        timeout=1, token_url=TOKEN_URL,
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        scope=SCOPES,
+        verify=False)
+    LOG.info('Got access token: %r', access_token)
+
+    return session
 
 
 @app.route('/')
 @cross_origin()
 def index():
+    # In production, this would be cached.
+    client = get_session()
+
     authorization = request.headers.get('Authorization', '')
     if not authorization.startswith('Bearer '):
         abort(403)

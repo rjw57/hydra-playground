@@ -1,5 +1,30 @@
 <!DOCTYPE html>
 <html>
-  <head></head>
-  <body></body>
+  <head>
+    <title>Grant Consent</title>
+  </head>
+  <body>
+    The application <strong>{{client.client_name}}</strong> wants access to the
+    following things:
+
+    <form action="{% url 'decide' %}" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="consent" value="{{consent_request.id}}">
+      <ul style="list-style-type: none">
+      {% for scope in requested_scopes %}
+        <li>
+          <input id="scope.{{forloop.counter}}" type="checkbox"
+              value="{{scope.scope}}" name="granted_scopes">
+          <label for="scope.{{forloop.counter}}">
+            {{scope.description}}
+          </label>
+        </li>
+      {% endfor %}
+      </ul>
+      <div style="text-align: center;">
+        <input type="submit" name="decision" value="Accept">
+        <input type="submit" name="decision" value="Reject">
+      </div>
+    </form>
+  </body>
 </html>
