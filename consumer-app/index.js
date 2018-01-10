@@ -38,13 +38,46 @@ window.App = {
       };
       window.addEventListener('message', eventListener, true);
 
-      openAuthWindow('http://localhost:9020/logout?redirect_url='
-        + encodeURIComponent(redirect_url.toString()));
+      const logoutUrl = 'http://localhost:9020/logout?redirect_url='
+        + encodeURIComponent(redirect_url.toString());
       document.body.classList.remove('user-logged-in');
       document.body.classList.add('user-logged-out');
+      openHiddenIframe(logoutUrl);
     }
 
-    function login() {
+    function onLogin(token) {
+        console.log('got login token:', token);
+
+        document.body.classList.remove('user-logged-out');
+        document.body.classList.add('user-logged-in');
+
+        document.getElementById('token').textContent = token.accessToken;
+
+        fetch(userInfoUri, token.sign({url: userInfoUri, mode: 'cors'}))
+          .then(response => response.json())
+          .then(response => {
+            console.log(response);
+            document.getElementById('user-info').textContent =
+              JSON.stringify(response);
+          })
+          .catch(console.error);
+
+        fetch(apiExampleUri, token.sign({url: apiExampleUri, mode: 'cors'}))
+          .then(response => response.json())
+          .then(response => {
+            console.log(response);
+            document.getElementById('my-client-id').textContent = response.clientId;
+            document.getElementById('my-user').textContent = response.user;
+            document.getElementById('my-scopes').textContent = response.scopes.join(', ');
+            document.getElementById('i-am-admin').textContent =
+              response.isAdmin ? "YES" : "NO";
+          })
+          .catch(console.error);
+    }
+
+    function login(opts) {
+      opts = opts ? opts : {};
+
       const token = new Promise((resolve, reject) => {
         const eventListener = event => {
           if(event.data.type === 'oauthCallback') {
@@ -57,49 +90,23 @@ window.App = {
         window.addEventListener('message', eventListener, true);
       });
 
-      token.catch(reason => {
+      token.then(onLogin).catch(reason => {
         showMessage('Fetching token failed: ' + JSON.stringify(reason));
       });
 
-      token.then(token => {
-        document.body.classList.remove('user-logged-out');
-        document.body.classList.add('user-logged-in');
-      });
+      if(opts.useHidden) {
+        openHiddenIframe(auth.token.getUri());
+      } else {
+        openAuthWindow(auth.token.getUri());
+      }
+    }
 
-      token.then(token => {
-        document.getElementById('token').textContent = token.accessToken;
-      });
-
-      token.then(token => {
-        console.log('token:', token);
-      });
-
-      token
-        .then(token => fetch(
-          userInfoUri, token.sign({url: userInfoUri, mode: 'cors'})))
-        .then(response => response.json())
-        .then(response => {
-          console.log(response);
-          document.getElementById('user-info').textContent =
-            JSON.stringify(response);
-        })
-        .catch(console.error);
-
-      token
-        .then(token => fetch(
-          apiExampleUri, token.sign({url: apiExampleUri, mode: 'cors'})))
-        .then(response => response.json())
-        .then(response => {
-          console.log(response);
-          document.getElementById('my-client-id').textContent = response.clientId;
-          document.getElementById('my-user').textContent = response.user;
-          document.getElementById('my-scopes').textContent = response.scopes.join(', ');
-          document.getElementById('i-am-admin').textContent =
-            response.isAdmin ? "YES" : "NO";
-        })
-        .catch(console.error);
-
-      openAuthWindow(auth.token.getUri());
+    function openHiddenIframe(url) {
+      let iframe = document.createElement('iframe');
+      iframe.setAttribute('src', url);
+      iframe.setAttribute('style', 'display: none');
+      iframe.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
+      document.body.appendChild(iframe);
     }
 
     function openAuthWindow(url) {
@@ -112,11 +119,12 @@ window.App = {
 
     document.getElementById('login').addEventListener('click', () => {login();});
     document.getElementById('logout').addEventListener('click', () => {logout();});
-    login();
+    login({ useHidden: true });
   },
 
   callbackLoaded: () => {
-    window.opener.postMessage({
+    let origin = window.opener ? window.opener : window.parent;
+    origin.postMessage({
       type: 'oauthCallback',
       info: {
         pathname: location.pathname, search: location.search, hash: location.hash,
@@ -125,7 +133,8 @@ window.App = {
   },
 
   loggedoutLoaded: () => {
-    window.opener.postMessage({
+    let origin = window.opener ? window.opener : window.parent;
+    origin.postMessage({
       type: 'logout',
       info: {
         pathname: location.pathname, search: location.search,
