@@ -43,7 +43,7 @@ window.App = {
         + encodeURIComponent(redirect_url.toString());
       document.body.classList.remove('user-logged-in');
       document.body.classList.add('user-logged-out');
-      openHiddenIframe(logoutUrl);
+      openAuthWindow(logoutUrl);
     }
 
     function onLogin(token) {
@@ -95,19 +95,7 @@ window.App = {
         showMessage('Fetching token failed: ' + JSON.stringify(reason));
       });
 
-      if(opts.useHidden) {
-        openHiddenIframe(auth.token.getUri());
-      } else {
-        openAuthWindow(auth.token.getUri());
-      }
-    }
-
-    function openHiddenIframe(url) {
-      let iframe = document.createElement('iframe');
-      iframe.setAttribute('src', url);
-      iframe.setAttribute('style', 'display: none');
-      iframe.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
-      document.body.appendChild(iframe);
+      openAuthWindow(auth.token.getUri());
     }
 
     function openAuthWindow(url) {
@@ -120,7 +108,7 @@ window.App = {
 
     document.getElementById('login').addEventListener('click', () => {login();});
     document.getElementById('logout').addEventListener('click', () => {logout();});
-    login({ useHidden: true });
+    login();
   },
 
   callbackLoaded: () => {
