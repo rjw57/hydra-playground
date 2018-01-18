@@ -72,7 +72,7 @@ hydra clients create --skip-tls-verify \
 	--grant-types authorization_code,implicit \
 	--response-types code,token \
 	--allowed-scopes https://automation.cam.ac.uk/funky-api,profile,email,openid \
-	--callbacks http://localhost:9010/callback,http://localhost:9030/callback.html
+	--callbacks http://localhost:9030/,http://localhost:9030/callback.html
 
 hydra clients create --skip-tls-verify \
 	--id ${API_CLIENT_ID} --secret ${API_CLIENT_SECRET} \

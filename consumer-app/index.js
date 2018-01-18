@@ -2,11 +2,11 @@ var ClientOAuth2 = require('client-oauth2');
 
 window.App = {
   indexLoaded: () => {
-    const state = 'some-nonce-which-really-should-be-random-' + Math.random();
+    const state = 'some-nonce-which-really-should-be-random';
     const auth = new ClientOAuth2({
       clientId: 'some-consumer',
       authorizationUri: 'https://localhost:9000/oauth2/auth',
-      redirectUri: 'http://localhost:9030/callback.html',
+      redirectUri: 'http://localhost:9030/',
       scopes: ['profile', 'email', 'https://automation.cam.ac.uk/funky-api'],
       state: state,
     });
@@ -78,23 +78,7 @@ window.App = {
     function login(opts) {
       opts = opts ? opts : {};
 
-      const token = new Promise((resolve, reject) => {
-        const eventListener = event => {
-          if(event.data.type === 'oauthCallback') {
-            event.source.close();
-            auth.token.getToken(event.source.location)
-              .then(resolve).catch(reject);
-            window.removeEventListener('message', eventListener);
-          }
-        };
-        window.addEventListener('message', eventListener, true);
-      });
-
-      token.then(onLogin).catch(reason => {
-        showMessage('Fetching token failed: ' + JSON.stringify(reason));
-      });
-
-      openAuthWindow(auth.token.getUri());
+      location.href = auth.token.getUri();
     }
 
     function openAuthWindow(url) {
@@ -105,9 +89,20 @@ window.App = {
       window.open(url, 'AuthWindow-' + Math.random(), features);
     }
 
+    const token = new Promise((resolve, reject) => {
+      auth.token.getToken(location).then(resolve).catch(reject);
+    });
+
+    token.then(token => {
+      console.log('got token', token);
+    });
+
+    token.then(onLogin).catch(reason => {
+      showMessage('Fetching token failed: ' + JSON.stringify(reason));
+    });
+
     document.getElementById('login').addEventListener('click', () => {login();});
     document.getElementById('logout').addEventListener('click', () => {logout();});
-    login();
   },
 
   callbackLoaded: () => {
